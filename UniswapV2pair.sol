@@ -35,6 +35,7 @@ contract UniswapV2Pair is ERC20,Math {
     uint256 public price0CumulativeLast;
     uint256 public price1CumulativeLast;
     bool private isEntered;
+    uint256 public fee;
 
     event Mint(address indexed sender,uint256 amount0,uint256 amount1);
     event Burn(address indexed sender,uint256 amount0,uint256 amount1,address to);
@@ -144,8 +145,8 @@ contract UniswapV2Pair is ERC20,Math {
             : 0;
         if (amount0in == 0 && amount1in == 0) revert InsufficientInputAmount();
         
-        uint256 balanceAdjusted0 = (balance0 * 1000) - (amount0in * 3);
-        uint256 balanceAdjusted1 = (balance1 * 1000) - (amount1in * 3);
+        uint256 balanceAdjusted0 = (balance0 * 1000) - (amount0in * fee);
+        uint256 balanceAdjusted1 = (balance1 * 1000) - (amount1in * fee);
 
         if (balanceAdjusted0 * balanceAdjusted1 <uint256(reserve0) * uint256(reserve1) * (1000**2)) revert Invalidk();
 
@@ -186,6 +187,11 @@ contract UniswapV2Pair is ERC20,Math {
         reserve1 = uint112(balance1);
         blockTimestampLast = uint32(block.timestamp);
         emit Sync(reserve0,reserve1);
+    }
+
+    function updataFee(uint256 newFee)public {
+        fee = newFee;
+
     }
 
     function _safeTransfer(address token,address to,uint256 value) private {
