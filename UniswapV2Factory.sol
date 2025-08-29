@@ -4,6 +4,11 @@ pragma solidity ^0.8.10;
 import "./UniswapV2pair.sol";
 import "./interfaces/IUniswapV2Factory.sol";
 
+interface IDynamicFeeManage{
+     function addPair(address pair)external;
+
+}
+
 contract UniswapV2Factory{
     error IdenticalAddresses();
     error PairExists();
@@ -18,6 +23,12 @@ contract UniswapV2Factory{
 
     mapping(address => mapping(address => address))public pairs;
     address[] public allPairs;
+    address public DynamicFeeManage;
+
+    constructor(address _DynamicFeeManage){
+        DynamicFeeManage = _DynamicFeeManage;
+
+    }
 
     function createPair(address tokenA,address tokenB)public returns(address pair){
         if(tokenA == tokenB) revert IdenticalAddresses();
@@ -37,6 +48,8 @@ contract UniswapV2Factory{
         pairs[token0][token1] = pair;
         pairs[token1][token0] = pair;
         allPairs.push(pair);
+
+        IDynamicFeeManage(DynamicFeeManage).addPair(pair);
 
         emit PairCreated(token0,token1,pair,allPairs.length);
     }
