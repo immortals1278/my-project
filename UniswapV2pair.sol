@@ -58,6 +58,8 @@ contract UniswapV2Pair is ERC20,Math {
         }
         token0 = _token0;
         token1 = _token1;
+
+        fee = 3;
     }
 
     function getReserves() public view returns(uint112,uint112,uint32){

@@ -50,6 +50,7 @@ contract UniswapV2Factory{
         allPairs.push(pair);
 
         IDynamicFeeManage(DynamicFeeManage).addPair(pair);
+        IDynamicFeeManage(DynamicFeeManage).firstSetFee(pair);
 
         emit PairCreated(token0,token1,pair,allPairs.length);
     }
