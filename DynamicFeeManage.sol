@@ -26,7 +26,9 @@ contract DynamicFeeManage is AutomationCompatibleInterface{
         
     }
 
-    function performUpKeep(bytes calldata performData)external override{}
+    function performUpKeep(bytes calldata performData)external override{
+        upDataFeeForPairs();
+    }
     
     function addPair(address pair)external {
         allPairs.push(pair);
@@ -37,10 +39,6 @@ contract DynamicFeeManage is AutomationCompatibleInterface{
     function firstSetFee(address pair)public {
         feeForPair[pair] = 3;
     }
-    
-    function checkUpKeep()public {}
-
-    function performUpKeep()public {}
 
     function upDataFeeForPairs()public {
         for(uint256 i = 0;i < allPairs.length;i++){
@@ -50,7 +48,8 @@ contract DynamicFeeManage is AutomationCompatibleInterface{
     }
     
     function upDataFeeForPair(address pair)internal returns(uint256 fee){
-        
+        //将pair的数据和chainlink数据发送到链下javascript(如何发到链下再发回来)
+        //调用链下javascript计算波动率和费率再发回来(如何调用链下)
         //IUniswapV2Pair(pair).updataFee(newFee);
 
     }
