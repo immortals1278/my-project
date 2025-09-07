@@ -16,6 +16,10 @@ error Invalidk();
 error TransferFailed();
 error BalanceOverflow();
 
+interface AutomationCompatibleInterface {
+    function checkUpKeep(bytes calldata checkData)external returns(bool upKeepNeeded,bytes memory performData);
+    function performUpKeep(bytes calldata performData)external;
+}
 
 interface IERC20 {
     function balanceOf(address) external returns (uint256);
@@ -23,9 +27,17 @@ interface IERC20 {
     function transfer(address to, uint256 amount) external;
 }
 
-contract UniswapV2Pair is ERC20,Math {
+contract UniswapV2Pair is ERC20,Math,AutomationCompatibleInterface {
 
 
+    struct priceData{
+        uint256 price;
+        uint256 timeStamp;
+    }
+    priceData[] public priceHistory;
+    uint256 public nextIndex;
+    uint256 public bufferSize;
+    bool public bufferFull;
     uint256 MINIMUM_LIQUIDITY = 1000;
     address public token0;
     address public token1;
@@ -36,10 +48,12 @@ contract UniswapV2Pair is ERC20,Math {
     uint256 public price1CumulativeLast;
     bool private isEntered;
     uint256 public fee;
+    address public owner;
 
     event Mint(address indexed sender,uint256 amount0,uint256 amount1);
     event Burn(address indexed sender,uint256 amount0,uint256 amount1,address to);
     event Swap(address indexed sender,uint256 amount0,uint256 amount1,address indexed to);
+    event PriceUpdate(uint256 price,uint256 timeStamp);
 
     modifier nonReentrant(){
         require(!isEntered);
@@ -47,9 +61,17 @@ contract UniswapV2Pair is ERC20,Math {
         _;
 
         isEntered = false;
+    }//防止重入攻击
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner");
+        _;
     }
 
-    constructor () ERC20("uniswapV2 Pair", "UNIV2", 18){}
+    constructor () ERC20("uniswapV2 Pair", "UNIV2", 18){
+        bufferSize = 50;
+        priceHistory = new priceData[](bufferSize);
+    }
 
     function initialize(address _token0,address _token1) public{
         if (token0 != address(0) || token1 != address(0)){
@@ -180,8 +202,16 @@ contract UniswapV2Pair is ERC20,Math {
             uint32 timeElapsed = uint32(block.timestamp) - blockTimestampLast;
 
             if(timeElapsed > 0 && reserve0 > 0 && reserve1 > 0){
-                price0CumulativeLast += uint256(UQ112x112.encode(reserve1).uqdiv(reserve0))*timeElapsed;
-                price1CumulativeLast += uint256(UQ112x112.encode(reserve0).uqdiv(reserve1))*timeElapsed;
+                uint256 twap = uint256(UQ112x112.encode(reserve1).uqdiv(reserve0))//数值为连续两次交易间的twap
+                price0CumulativeLast += twap * timeElapsed;
+                price1CumulativeLast += uint256(UQ112x112.encode(reserve0).uqdiv(reserve1)) * timeElapsed;
+                
+                priceHistory[nextIndex] = price(twap,block.timestamp);
+                emit PriceUpdate(twap,block.timestamp);
+                nextIndex = (nextIndex + 1) % bufferSize;
+
+                if (nextIndex == 0 && !bufferFull){
+                    bufferFull = true;
                 }
                 }
 
@@ -191,10 +221,16 @@ contract UniswapV2Pair is ERC20,Math {
         emit Sync(reserve0,reserve1);
     }
 
+
     function updataFee(uint256 newFee)public {
         fee = newFee;
-
     }
+
+    function getPriceCount()public view returns(uint256){
+        return bufferFull ? bufferSize : nextIndex;
+    }
+
+
 
     function _safeTransfer(address token,address to,uint256 value) private {
         (bool success,bytes memory data) = token.call(abi.encodeWithSignature("transfer(address,uint156)",to,value));
