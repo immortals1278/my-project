@@ -3,6 +3,8 @@ pragma solidity ^0.8.10;
 
 import "./interfaces/IUniswapV2Pair.sol";
 
+error upKeepNotNeeded();
+
 interface AutomationCompatibleInterface {
     function checkUpKeep(bytes calldata checkData)external returns(bool upKeepNeeded,bytes memory performData);
     function performUpKeep(bytes calldata performData)external;
@@ -27,7 +29,14 @@ contract DynamicFeeManage is AutomationCompatibleInterface{
     }
 
     function performUpKeep(bytes calldata performData)external override{
+        if((block.timestamp - lastTimeStamp) < interval){
+            revert upKeepNotNeeded();
+        }
+
+        upDatePriceForPairs();
         upDataFeeForPairs();
+
+        lastTimeStamp = block.timestamp;
     }
     
     function addPair(address pair)external {
@@ -52,6 +61,12 @@ contract DynamicFeeManage is AutomationCompatibleInterface{
         //调用链下javascript计算波动率和费率再发回来(如何调用链下)
         //IUniswapV2Pair(pair).updataFee(newFee);
 
+    }
+
+    function upDatePriceForPairs()public {
+        for(uint256 i = 0;i < allPairs.length;i++){
+            IUniswapV2Pair(allPairs[i]).updatePrice();
+        }
     }
 
 }

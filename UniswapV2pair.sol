@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.20;
 
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./libraries/UQ112x112.sol";
 import "./libraries/Math.sol";
@@ -16,10 +17,6 @@ error Invalidk();
 error TransferFailed();
 error BalanceOverflow();
 
-interface AutomationCompatibleInterface {
-    function checkUpKeep(bytes calldata checkData)external returns(bool upKeepNeeded,bytes memory performData);
-    function performUpKeep(bytes calldata performData)external;
-}
 
 interface IERC20 {
     function balanceOf(address) external returns (uint256);
@@ -27,13 +24,18 @@ interface IERC20 {
     function transfer(address to, uint256 amount) external;
 }
 
-contract UniswapV2Pair is ERC20,Math,AutomationCompatibleInterface {
+contract UniswapV2Pair is ERC20,Math{
 
 
+    AggregatorV3Interface internal priceFeed;
     struct priceData{
         uint256 price;
         uint256 timeStamp;
     }
+    priceData[] public priceHistoryOut;
+    uint256 public nextIndexOut;
+    uint256 public bufferSizeOut;
+    bool public bufferFullOut;
     priceData[] public priceHistory;
     uint256 public nextIndex;
     uint256 public bufferSize;
@@ -54,6 +56,7 @@ contract UniswapV2Pair is ERC20,Math,AutomationCompatibleInterface {
     event Burn(address indexed sender,uint256 amount0,uint256 amount1,address to);
     event Swap(address indexed sender,uint256 amount0,uint256 amount1,address indexed to);
     event PriceUpdate(uint256 price,uint256 timeStamp);
+    event sync(uint112 reserve0,uint112 reserve1);
 
     modifier nonReentrant(){
         require(!isEntered);
@@ -68,9 +71,12 @@ contract UniswapV2Pair is ERC20,Math,AutomationCompatibleInterface {
         _;
     }
 
-    constructor () ERC20("uniswapV2 Pair", "UNIV2", 18){
+    constructor (address _priceFeed) ERC20("uniswapV2 Pair", "UNIV2", 18){
         bufferSize = 50;
+        bufferSizeOut = 24;
+        priceHistoryOut = new priceData[](bufferSizeOut);
         priceHistory = new priceData[](bufferSize);
+        priceFeed = AggregatorV3Interface(_priceFeed);
     }
 
     function initialize(address _token0,address _token1) public{
@@ -206,7 +212,7 @@ contract UniswapV2Pair is ERC20,Math,AutomationCompatibleInterface {
                 price0CumulativeLast += twap * timeElapsed;
                 price1CumulativeLast += uint256(UQ112x112.encode(reserve0).uqdiv(reserve1)) * timeElapsed;
                 
-                priceHistory[nextIndex] = price(twap,block.timestamp);
+                priceHistory[nextIndex] = priceData{price:twap,timeStamp:block.timestamp};
                 emit PriceUpdate(twap,block.timestamp);
                 nextIndex = (nextIndex + 1) % bufferSize;
 
@@ -238,6 +244,38 @@ contract UniswapV2Pair is ERC20,Math,AutomationCompatibleInterface {
             revert TransferFailed();
         }
     }
+
+    function getLatestPrice()public view returns(int256){
+        (   
+            uint80 roundID,         
+            int256 price,          
+            uint256 startedAt,      
+            uint256 updatedAt,      
+            uint80 answeredInRound
+            ) = priceFeed.latestRoundData();
+            return price;
+    }
+
+    function getDecimals()public view returns(uint8){
+        return priceFeed.decimals();
+    }
+
+    function updatePrice()public {
+        uint256 price = getLatestPrice();
+        priceHistoryOut[nextIndexOut] = priceData{price:price,timeStamp:block.timestamp};
+        nextIndexOut = (nextIndexOut + 1) % bufferSizeOut;
+        if (nextIndexOut == 0 && !bufferFullOut){
+                    bufferFullOut = true;
+        }
+        
+    }
+
+    function getPriceOutCount()public view returns(uint256){
+        return bufferFullOut ? bufferSizeOut : nextIndexOut;
+    }
+
+
+    
 
 
 
