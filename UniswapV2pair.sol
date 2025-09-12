@@ -27,6 +27,11 @@ interface IERC20 {
 contract UniswapV2Pair is ERC20,Math{
 
 
+    uint256 public sum0;
+    uint256 public sumSq0;
+    uint256 public sum;
+    uint256 public sumSq;
+    uint256 public priceCount;
     AggregatorV3Interface internal priceFeed;
     struct priceData{
         uint256 price;
@@ -36,10 +41,6 @@ contract UniswapV2Pair is ERC20,Math{
     uint256 public nextIndexOut;
     uint256 public bufferSizeOut;
     bool public bufferFullOut;
-    priceData[] public priceHistory;
-    uint256 public nextIndex;
-    uint256 public bufferSize;
-    bool public bufferFull;
     uint256 MINIMUM_LIQUIDITY = 1000;
     address public token0;
     address public token1;
@@ -57,6 +58,7 @@ contract UniswapV2Pair is ERC20,Math{
     event Swap(address indexed sender,uint256 amount0,uint256 amount1,address indexed to);
     event PriceUpdate(uint256 price,uint256 timeStamp);
     event sync(uint112 reserve0,uint112 reserve1);
+    event newPrice(uint256);
 
     modifier nonReentrant(){
         require(!isEntered);
@@ -211,14 +213,12 @@ contract UniswapV2Pair is ERC20,Math{
                 uint256 twap = uint256(UQ112x112.encode(reserve1).uqdiv(reserve0))//数值为连续两次交易间的twap
                 price0CumulativeLast += twap * timeElapsed;
                 price1CumulativeLast += uint256(UQ112x112.encode(reserve0).uqdiv(reserve1)) * timeElapsed;
-                
-                priceHistory[nextIndex] = priceData{price:twap,timeStamp:block.timestamp};
-                emit PriceUpdate(twap,block.timestamp);
-                nextIndex = (nextIndex + 1) % bufferSize;
+                emit newPrice(twap);//发到链下
+                if(priceCount < 60){priceCount++;}//更新列表长度
+                //拿到链下old price
+                sum = sum + twap -oldPrice;
+                sumSq = sumSq + twap * twap - oldPrice * oldPrice; 
 
-                if (nextIndex == 0 && !bufferFull){
-                    bufferFull = true;
-                }
                 }
 
         reserve0 = uint112(balance0);
@@ -227,15 +227,20 @@ contract UniswapV2Pair is ERC20,Math{
         emit Sync(reserve0,reserve1);
     }
 
-
-    function updataFee(uint256 newFee)public {
-        fee = newFee;
-    }
-
     function getPriceCount()public view returns(uint256){
-        return bufferFull ? bufferSize : nextIndex;
+        return priceCount;
     }
 
+    function getMean()public view returns(uint256){
+        uint256 count = getPriceCount();
+        return sum / count;
+    }
+
+    function getVariance()public view returns(uint256){
+        uint256 mean = getMean();
+        uint256 count = getPriceCount();
+        return sumSq / count - mean * mean;
+    }
 
 
     function _safeTransfer(address token,address to,uint256 value) private {
@@ -254,25 +259,48 @@ contract UniswapV2Pair is ERC20,Math{
             uint80 answeredInRound
             ) = priceFeed.latestRoundData();
             return price;
-    }
+    }//外部
 
     function getDecimals()public view returns(uint8){
         return priceFeed.decimals();
-    }
+    }//外部
 
     function updatePrice()public {
         uint256 price = getLatestPrice();
+        sum0 = sum0 + price -priceHistoryOut[nextIndexOut].price;
+        sumSq0 = sumSq0 + price * price - priceHistoryOut[nextIndexOut].price * priceHistoryOut[nextIndexOut].price;
         priceHistoryOut[nextIndexOut] = priceData{price:price,timeStamp:block.timestamp};
         nextIndexOut = (nextIndexOut + 1) % bufferSizeOut;
         if (nextIndexOut == 0 && !bufferFullOut){
-                    bufferFullOut = true;
+            bufferFullOut = true;
         }
         
-    }
+    }//外部
 
     function getPriceOutCount()public view returns(uint256){
         return bufferFullOut ? bufferSizeOut : nextIndexOut;
+    }//外部
+
+    function getMean0()public view returns(uint256){
+        uint256 count = getPriceOutCount();
+        return sum0 / count;
     }
+
+    function getVariance0()public view returns(uint256){
+        uint256 mean0 = getMean0();
+        uint256 count = getPriceCount();
+        return sumSq0 / count - mean0 * mean0;
+    }
+
+    function updataFee()public returns(uint256){
+        //算方差然后算费率
+        uint256 variance0 = getVariance0();
+        uint256 variance = getVariance();
+        
+    }
+
+
+ 
 
 
     

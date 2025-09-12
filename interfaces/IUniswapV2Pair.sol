@@ -15,4 +15,6 @@ interface IUniswapV2Pair{
     function swap(uint256,uint256,address,bytes calldata)external;
 
     function updatePrice()external;
+
+    function updateFee()external returns(uint256);
 }
