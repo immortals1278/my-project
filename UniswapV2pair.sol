@@ -27,6 +27,8 @@ interface IERC20 {
 contract UniswapV2Pair is ERC20,Math{
 
 
+    uint256 public k;
+    uint256 constant ONE;
     uint256 public sum0;
     uint256 public sumSq0;
     uint256 public sum;
@@ -51,6 +53,7 @@ contract UniswapV2Pair is ERC20,Math{
     uint256 public price1CumulativeLast;
     bool private isEntered;
     uint256 public fee;
+    uint256 public feeMaxAdd;
     address public owner;
 
     event Mint(address indexed sender,uint256 amount0,uint256 amount1);
@@ -79,6 +82,10 @@ contract UniswapV2Pair is ERC20,Math{
         priceHistoryOut = new priceData[](bufferSizeOut);
         priceHistory = new priceData[](bufferSize);
         priceFeed = AggregatorV3Interface(_priceFeed);
+        fee = 3e15;
+        feeMax = 7e15;
+        k = 1e18;
+        uint256 ONE = 1e18;
     }
 
     function initialize(address _token0,address _token1) public{
@@ -89,7 +96,7 @@ contract UniswapV2Pair is ERC20,Math{
         token0 = _token0;
         token1 = _token1;
 
-        fee = 3;
+        
     }
 
     function getReserves() public view returns(uint112,uint112,uint32){
@@ -210,14 +217,15 @@ contract UniswapV2Pair is ERC20,Math{
             uint32 timeElapsed = uint32(block.timestamp) - blockTimestampLast;
 
             if(timeElapsed > 0 && reserve0 > 0 && reserve1 > 0){
-                uint256 twap = uint256(UQ112x112.encode(reserve1).uqdiv(reserve0))//数值为连续两次交易间的twap
-                price0CumulativeLast += twap * timeElapsed;
+                uint256 priceIn = uint256(UQ112x112.encode(reserve1).uqdiv(reserve0))//数值为连续两次交易间的twap
+                price0CumulativeLast += priceIn * timeElapsed;
                 price1CumulativeLast += uint256(UQ112x112.encode(reserve0).uqdiv(reserve1)) * timeElapsed;
+                uint256 twap = (priceIn * 1e18) >> 112;
                 emit newPrice(twap);//发到链下
                 if(priceCount < 60){priceCount++;}//更新列表长度
                 //拿到链下old price
                 sum = sum + twap -oldPrice;
-                sumSq = sumSq + twap * twap - oldPrice * oldPrice; 
+                sumSq = (sumSq + twap * twap - oldPrice * oldPrice) / ONE; 
 
                 }
 
@@ -236,10 +244,13 @@ contract UniswapV2Pair is ERC20,Math{
         return sum / count;
     }
 
-    function getVariance()public view returns(uint256){
+    function getCV()public view returns(uint256){
         uint256 mean = getMean();
         uint256 count = getPriceCount();
-        return sumSq / count - mean * mean;
+        uint256 var = sumSq / count - (mean * mean / ONE);
+        uint256 std = sqrt(var) * 1e9;
+        return (std * ONE) / mean;
+
     }
 
 
@@ -266,7 +277,9 @@ contract UniswapV2Pair is ERC20,Math{
     }//外部
 
     function updatePrice()public {
-        uint256 price = getLatestPrice();
+        uint256 priceOut = getLatestPrice();
+        uint256 decimals = getDecimals();
+        uint256 price = priceOut * (10**(18 - decimals));
         sum0 = sum0 + price -priceHistoryOut[nextIndexOut].price;
         sumSq0 = sumSq0 + price * price - priceHistoryOut[nextIndexOut].price * priceHistoryOut[nextIndexOut].price;
         priceHistoryOut[nextIndexOut] = priceData{price:price,timeStamp:block.timestamp};
@@ -281,21 +294,31 @@ contract UniswapV2Pair is ERC20,Math{
         return bufferFullOut ? bufferSizeOut : nextIndexOut;
     }//外部
 
-    function getMean0()public view returns(uint256){
+    function getMeanOut()public view returns(uint256){
         uint256 count = getPriceOutCount();
         return sum0 / count;
     }
 
-    function getVariance0()public view returns(uint256){
-        uint256 mean0 = getMean0();
-        uint256 count = getPriceCount();
-        return sumSq0 / count - mean0 * mean0;
+    function getCVOut()public view returns(uint256){
+       uint256 mean = getMeanOut();
+        uint256 count = getPriceOutCount();
+        uint256 var = sumSq0 / count - (mean * mean / ONE);
+        uint256 std = sqrt(var) * 1e9;
+        return (std * ONE) / mean;
     }
 
     function updataFee()public returns(uint256){
         //算方差然后算费率
-        uint256 variance0 = getVariance0();
-        uint256 variance = getVariance();
+        uint256 cvIn = getCV();
+        uint256 cvOut = getCVOut();
+        cvCombined = cvIn * 3e17 + cvOut * 7e17;
+        uint256 delta = k * cvCombined / ONE;
+        if(delta > feeMaxAdd){
+            delta = feeMaxAdd;
+        }
+        fee = fee + delta;
+        return fee;
+
         
     }
 
