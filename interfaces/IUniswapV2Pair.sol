@@ -17,4 +17,7 @@ interface IUniswapV2Pair{
     function updatePrice()external;
 
     function updateFee()external returns(uint256);
+
+    function getFee()external view returns(uint256);
+
 }

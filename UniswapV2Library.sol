@@ -68,14 +68,18 @@ library UniswapV2Library{
     function getAmountOUt(
         uint256 amountIn,
         uint256 reserveIn,
-        uint256 reserveOut
+        uint256 reserveOut,
+        address token0,
+        address token1,
+        address factory
     )public pure returns (uint256 amountOut){
         if (amountIn == 0) revert InsufficientAmount();
         if (reserveIn == 0 || reserveOut == 0) revert InsufficientLiquidity();
 
-        uint256 amountInWithFee = amountIn * 997;
+        uint256 fee = IUniswapV2Pair(pairFor(factory,token0,token1)).getFee();
+        uint256 amountInWithFee = (amountIn * (1e18 - fee)) / 1e18;//手续费没进到池子里
         uint256 numerator = amountInWithFee * reserveOut;
-        uint256 denominator = (reserveIn * 1000) + amountInWithFee;
+        uint256 denominator = reserveIn + amountInWithFee;
 
         return numerator / denominator;
     }
@@ -98,7 +102,10 @@ library UniswapV2Library{
             amounts[i + 1] = getAmountOut(
                 amounts[i],
                 reserve0,
-                reserve1
+                reserve1,
+                path[i],
+                path[i + 1],
+                factory
             );
         }
 
@@ -108,13 +115,17 @@ library UniswapV2Library{
     function getAmountIn(
         uint256 amountOut,
         uint256 reserveIn,
-        uint256 reserveOut
+        uint256 reserveOut,
+        address token0,
+        address token1,
+        address factory
     ) public pure returns (uint256) {
         if (amountOut == 0) revert InsufficientAmount();
         if (reserveIn == 0 || reserveOut == 0) revert InsufficientLiquidity();
 
-        uint256 numerator = reserveIn * amountOut * 1000;
-        uint256 denominator = (reserveOut - amountOut) * 997;
+        uint256 fee = IUniswapV2Pair(pairFor(factory,token0,token1)).getFee();
+        uint256 numerator = reserveIn * amountOut;
+        uint256 denominator = (reserveOut - amountOut) * (1e18 - fee) / 1e18;
 
         return (numerator / denominator) + 1;
     }
@@ -137,7 +148,10 @@ library UniswapV2Library{
             amounts[i - 1] = getAmountIn(
                 amounts[i],
                 reserve0,
-                reserve1
+                reserve1,
+                path[i - 1],
+                path[i],
+                factory
             );
         }
 

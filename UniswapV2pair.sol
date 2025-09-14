@@ -54,6 +54,7 @@ contract UniswapV2Pair is ERC20,Math{
     bool private isEntered;
     uint256 public fee;
     uint256 public feeMaxAdd;
+    uint256 public baseFee;
     address public owner;
 
     event Mint(address indexed sender,uint256 amount0,uint256 amount1);
@@ -83,9 +84,10 @@ contract UniswapV2Pair is ERC20,Math{
         priceHistory = new priceData[](bufferSize);
         priceFeed = AggregatorV3Interface(_priceFeed);
         fee = 3e15;
-        feeMax = 7e15;
+        feeMaxAdd = 7e15;
         k = 1e18;
-        uint256 ONE = 1e18;
+        ONE = 1e18;
+        baseFee = 3e15;
     }
 
     function initialize(address _token0,address _token1) public{
@@ -184,10 +186,10 @@ contract UniswapV2Pair is ERC20,Math{
             : 0;
         if (amount0in == 0 && amount1in == 0) revert InsufficientInputAmount();
         
-        uint256 balanceAdjusted0 = (balance0 * 1000) - (amount0in * fee);
-        uint256 balanceAdjusted1 = (balance1 * 1000) - (amount1in * fee);
+        uint256 balanceAdjusted0 = balance0 - (amount0in * fee / ONE);
+        uint256 balanceAdjusted1 = balance1 - (amount1in * fee / ONE);
 
-        if (balanceAdjusted0 * balanceAdjusted1 <uint256(reserve0) * uint256(reserve1) * (1000**2)) revert Invalidk();
+        if (balanceAdjusted0 * balanceAdjusted1 <uint256(reserve0) * uint256(reserve1)) revert Invalidk();
 
         _update(balance0,balance1,reserve0,reserve1);
 
@@ -308,7 +310,6 @@ contract UniswapV2Pair is ERC20,Math{
     }
 
     function updataFee()public returns(uint256){
-        //算方差然后算费率
         uint256 cvIn = getCV();
         uint256 cvOut = getCVOut();
         cvCombined = cvIn * 3e17 + cvOut * 7e17;
@@ -316,10 +317,12 @@ contract UniswapV2Pair is ERC20,Math{
         if(delta > feeMaxAdd){
             delta = feeMaxAdd;
         }
-        fee = fee + delta;
+        fee = baseFee + delta;
         return fee;
+    }
 
-        
+    function getFee()public view returns(uint256){
+        return fee;
     }
 
 
