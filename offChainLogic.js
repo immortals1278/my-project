@@ -1,23 +1,26 @@
+import { CircularBuffer } from "./circularBuffer.js";
+
+
+const circularBuffer = new CircularBuffer();
 const { ethers } = require("ethers");
 const privateKey = process.env.PRIVATE_KEY;
-
 const provider = new ethers.providers.WebSocketProvider(
     "wss://mainnet.infura.io/ws/v3/My_PROJECT_ID"
 );//示例ID
-
 const abi = [
     "event newPrice(uint256);",
     "function callback(uint256 id, string memory data) external"
 ]
-
 const contractAddress = "0x1234567890123456789012345678901234567890";//示例地址
-
 const contract = new ethers.Contract(contractAddress,abi,provider);
 
-contract.on("newPrice",()=>{
+contract.on("newPrice",(price)=>{
     console.log("newPrice",price);
-    //拿环形缓冲区中最老的元素，前60次不用拿
-    sendCallBack(oldPrice);
+    oldprice = circularBuffer.enqueue(price);
+    if(circularBuffer.bufferFull){
+        sendCallBack(oldPrice);
+    }
+    
 })
 
 async function sendCallBack(oldPrice){
