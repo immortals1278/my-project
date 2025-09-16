@@ -41,13 +41,10 @@ contract DynamicFeeManage is AutomationCompatibleInterface{
     
     function addPair(address pair)external {
         allPairs.push(pair);
-        feeForPair[pair] = 3;
+        feeForPair[pair] = 3e15;
 
     }
 
-    function firstSetFee(address pair)public {
-        feeForPair[pair] = 3;
-    }//这有什么用？？
 
     function upDataFeeForPairs()public {
         for(uint256 i = 0;i < allPairs.length;i++){

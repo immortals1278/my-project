@@ -55,6 +55,7 @@ contract UniswapV2Pair is ERC20,Math{
     uint256 public fee;
     uint256 public feeMaxAdd;
     uint256 public baseFee;
+    uin256 public oldPrice;
     address public owner;
 
     event Mint(address indexed sender,uint256 amount0,uint256 amount1);
@@ -225,7 +226,6 @@ contract UniswapV2Pair is ERC20,Math{
                 uint256 twap = (priceIn * 1e18) >> 112;
                 emit newPrice(twap);//发到链下
                 if(priceCount < 60){priceCount++;}//更新列表长度
-                //拿到链下old price
                 sum = sum + twap -oldPrice;
                 sumSq = (sumSq + twap * twap - oldPrice * oldPrice) / ONE; 
 
@@ -235,6 +235,10 @@ contract UniswapV2Pair is ERC20,Math{
         reserve1 = uint112(balance1);
         blockTimestampLast = uint32(block.timestamp);
         emit Sync(reserve0,reserve1);
+    }
+
+    function callback(_oldPrice)external {
+        oldPrice = _oldPrice;
     }
 
     function getPriceCount()public view returns(uint256){
@@ -324,6 +328,7 @@ contract UniswapV2Pair is ERC20,Math{
     function getFee()public view returns(uint256){
         return fee;
     }
+
 
 
  
