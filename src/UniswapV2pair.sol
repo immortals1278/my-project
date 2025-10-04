@@ -78,11 +78,10 @@ contract UniswapV2Pair is ERC20,Math{
         _;
     }
 
-    constructor (address _priceFeed) ERC20("uniswapV2 Pair", "UNIV2", 18){
+    constructor () ERC20("uniswapV2 Pair", "UNIV2", 18){
         bufferSize = 50;
         bufferSizeOut = 24;
         priceHistoryOut = new priceData[](bufferSizeOut);
-        priceFeed = AggregatorV3Interface(_priceFeed);
         fee = 3e15;
         feeMaxAdd = 7e15;
         k = 1e18;
@@ -90,13 +89,14 @@ contract UniswapV2Pair is ERC20,Math{
         baseFee = 3e15;
     }
 
-    function initialize(address _token0,address _token1) public{
+    function initialize(address _token0,address _token1,address _priceFeed) public{
         if (token0 != address(0) || token1 != address(0)){
 
             revert alreadyInitialized();
         }
         token0 = _token0;
         token1 = _token1;
+        priceFeed = AggregatorV3Interface(_priceFeed);
 
         
     }
@@ -234,6 +234,7 @@ contract UniswapV2Pair is ERC20,Math{
         reserve1 = uint112(balance1);
         blockTimestampLast = uint32(block.timestamp);
         emit Sync(reserve0,reserve1);
+        }
     }
 
     function callback(uint256 _oldPrice)external {
@@ -327,15 +328,5 @@ contract UniswapV2Pair is ERC20,Math{
     function getFee()public view returns(uint256){
         return fee;
     }
-
-
-
- 
-
-
-    
-
-
-
     
 }

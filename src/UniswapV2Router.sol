@@ -38,14 +38,14 @@ contract UniswapV2Router{
         if(factory.pairs[tokenA][tokenB] == 0){
             factory.createPair(tokenA,tokenB);
         }
-            (amountA,amountB) = _calculateLiquidity(
-                tokenA,
-                tokenB,
-                amountADesired,
-                amountBDesired,
-                amountAMin,
-                amountBMin
-            );
+        (amountA,amountB) = _calculateLiquidity(
+            tokenA,
+            tokenB,
+            amountADesired,
+            amountBDesired,
+            amountAMin,
+            amountBMin
+        );
 
         address pairAddress = UniswapV2Library.pairFor(
             address(factory),
