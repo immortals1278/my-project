@@ -132,7 +132,7 @@ contract UniswapV2Pair is ERC20,Math{
         
     }
 
-    function burn(addressto) public returns(uint256 amount0,uint256 amount1){
+    function burn(address to) public returns(uint256 amount0,uint256 amount1){
         uint256 balance0 = IERC20(token0).balanceOf(address(this));
         uint256 balance1 = IERC20(token1).balanceOf(address(this));
         uint256 Liquidity = balanceOf[address(this)];

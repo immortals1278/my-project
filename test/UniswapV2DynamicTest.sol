@@ -10,6 +10,10 @@ import "../src/testToken/tokenA.sol";
 import "../src/testToken/tokenB.sol";
 
 contract UniswapV2DynamicTest is Test {
+    uint256 amountA;
+    uint256 amountB;
+    uint256 liquidity;
+    
     UniswapV2Router public router;
     UniswapV2Factory public factory;
     DynamicFeeManage public feeManage;
@@ -44,13 +48,16 @@ contract UniswapV2DynamicTest is Test {
         tokenA.approve(address(router),type(uint256).max);
         tokenB.approve(address(router),type(uint256).max);
         tokenC.approve(address(router),type(uint256).max);
+        IUniswapV2Pair(pair1).approve(address(router),type(uint256).max);
+        IUniswapV2Pair(pair2).approve(address(router),type(uint256).max);
+
         vm.stopPrank();
     }
 
     function testAddLiquidityToPair1()public {
 //测试首次添加
         vm.startPrank(user);
-        router.addLiquidity(
+        (,,liquidity) = router.addLiquidity(
             address(tokenA),
             address(tokenB),
             1000 ether,
@@ -62,6 +69,8 @@ contract UniswapV2DynamicTest is Test {
         vm.stopPrank();
 
         (uint256 reserveA,uint256 reserveB) = pair1.getReserves();
+        uint lpBalance = IUniswapV2Pair(pair1).balanceOf(user);
+        assertEq(lpBalance, liquidity, "LP余额不符");
         assertEq(reserveA,1000 ether);
         assertEq(reserveB,2000 ether);
         assertEq(tokenA.balanceOf(user),9000 ether);
@@ -69,7 +78,7 @@ contract UniswapV2DynamicTest is Test {
 
 //测试非首次添加
         vm.startPrank(user);
-        router.addLiquidity(
+        (,,liquidity) = router.addLiquidity(
             address(tokenA),
             address(tokenB),
             1000 ether,
@@ -81,10 +90,55 @@ contract UniswapV2DynamicTest is Test {
         vm.stopPrank();
 
         (uint256 reserveA,uint256 reserveB) = pair1.getReserves();
+        uint lpBalance = IUniswapV2Pair(pair1).balanceOf(user);
+        assertEq(lpBalance, liquidity, "LP余额不符");
         assertEq(reserveA,1000 ether);
         assertEq(reserveB,2000 ether);
         assertEq(tokenA.balanceOf(user),9000 ether);
         assertEq(tokenB.balanceOf(user),8000 ether);
 
+    }
+
+    function testRemoveLiquidity()public {
+        vm.startPrank(user);
+        (amountA,amountB) = router.removeLiquidity(
+            address(tokenA),
+            address(tokenB),
+            liquidity,
+            0,
+            0,
+            user
+        );
+        
+        uint lpAfter = IUniswapV2Pair(pair1).balanceOf(user);
+        assertEq(lpAfter, 0, "LP余额不符");
+        vm.stopPrank();
+    }
+
+    function swapExactTokensForTokens()public{
+//给pair2添加流动性
+        router.addLiquidity(
+            address(tokenB),
+            address(tokenC),
+            1000 ether,
+            2000 ether,
+            1000 ether,
+            2000 ether,
+            user
+        );
+
+        vm.startPrank(user);
+        router.swapExactTokensForTokens(100 ether,0,[address(tokenA),address(tokenB),address(tokenC)], to);
+        vm.stopPrank();
+//验证语句
+        
+    }
+
+    function swapTokensForExactTokens()public{
+        vm.startPrank(user);
+        router.swapTokensForExactTokens(100 ether,0,[address(tokenA),address(tokenB),address(tokenC)], to);
+        vm.stopPrank();
+//验证语句
+        
     }
 }
