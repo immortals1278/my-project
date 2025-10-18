@@ -6,8 +6,6 @@ import "../src/UniswapV2Router.sol";
 import "../src/UniswapV2Factory.sol";
 import "../src/DynamicFeeManage.sol";
 import "../src/UniswapV2Pair.sol";
-import "../src/testToken/tokenA.sol";
-import "../src/testToken/tokenB.sol";
 
 contract UniswapV2DynamicTest is Test {
     uint256 amountA;
