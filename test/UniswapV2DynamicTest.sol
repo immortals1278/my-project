@@ -97,6 +97,16 @@ contract UniswapV2DynamicTest is Test {
     function testRemoveLiquidity()public {
         vm.startPrank(user);
         
+        router.addLiquidity(
+            address(tokenA),
+            address(tokenB),
+            1000 ether,
+            2000 ether,
+            1000 ether,
+            2000 ether,
+            user
+        );
+
         (amountA,amountB) = router.removeLiquidity(
             address(tokenA),
             address(tokenB),
@@ -112,7 +122,16 @@ contract UniswapV2DynamicTest is Test {
     }
 
     function swapExactTokensForTokens()public{
-//给pair2添加流动性
+        vm.startPrank(user);
+        router.addLiquidity(
+            address(tokenA),
+            address(tokenB),
+            1000 ether,
+            2000 ether,
+            1000 ether,
+            2000 ether,
+            user
+        );
         router.addLiquidity(
             address(tokenB),
             address(tokenC),
@@ -123,18 +142,35 @@ contract UniswapV2DynamicTest is Test {
             user
         );
 
-        vm.startPrank(user);
         router.swapExactTokensForTokens(100 ether,0,[address(tokenA),address(tokenB),address(tokenC)], to);
         vm.stopPrank();
-//验证语句
+//TODO验证语句
         
     }
 
     function swapTokensForExactTokens()public{
         vm.startPrank(user);
+        router.addLiquidity(
+            address(tokenA),
+            address(tokenB),
+            1000 ether,
+            2000 ether,
+            1000 ether,
+            2000 ether,
+            user
+        );
+        router.addLiquidity(
+            address(tokenB),
+            address(tokenC),
+            1000 ether,
+            2000 ether,
+            1000 ether,
+            2000 ether,
+            user
+        );
         router.swapTokensForExactTokens(100 ether,0,[address(tokenA),address(tokenB),address(tokenC)], to);
         vm.stopPrank();
-//验证语句
+//TODO验证语句
         
     }
 }
