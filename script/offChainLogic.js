@@ -1,30 +1,32 @@
 import { CircularBuffer } from "./circularBuffer.js";
 
+require('dotenv').config();
 
 const circularBuffer = new CircularBuffer();
 const { ethers } = require("ethers");
 const privateKey = process.env.PRIVATE_KEY;
 const provider = new ethers.providers.WebSocketProvider(
-    "wss://mainnet.infura.io/ws/v3/My_PROJECT_ID"
-);//示例ID
+    "ws://localhost:8545"
+);//ID for test
 const abi = [
     "event newPrice(uint256);",
     "function callback(uint256 id, string memory data) external"
 ]
-const contractAddress = "0x1234567890123456789012345678901234567890";//示例地址
-const contract = new ethers.Contract(contractAddress,abi,provider);
+const eventSignature = "newPrice(uint256)";
+const eventTopic = ethers.utils.id(eventSignature);
 
-contract.on("newPrice",(price)=>{
-    console.log("newPrice",price);
-    oldprice = circularBuffer.enqueue(price);
+provider.on({topics:[eventTopic]},(log)=>{
+    const contract = new ethers.Contract(log.address,abi,provider);
+    const event = contract.interface.parseLog(log);
+    oldprice = circularBuffer.enqueue(event.args.price);//update buffer
     if(circularBuffer.bufferFull){
-        sendCallBack(oldPrice);
+        sendCallBack(oldPrice,log.address);
     }
-    
 })
 
-async function sendCallBack(oldPrice){
+async function sendCallBack(oldPrice,contractAddress){
     try{
+        const contract = new ethers.Contract(contractAddress,abi,provider);
         const wallet = new ethers.Wallet(privateKey,provider);
         const contractWithSigner = contract.connect(wallet);
         const tx = await contractWithSigner.callback(oldPrice);
